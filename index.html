@@ -1,0 +1,119 @@
+<!-- ... existing code ... -->
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+            import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+            import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+            import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+            // Firebase Configuration (Exact config provided by user)
+<!-- ... existing code ... -->
+        // Initialize Firebase
+        let app, auth, db, storage, scriptsCollection;
+        let dbInitialized = false;
+
+        // App State
+<!-- ... existing code ... -->
+        async function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                storage = getStorage(app);
+                
+                // Authenticate anonymously to access Firestore
+<!-- ... existing code ... -->
+            <div class="flex flex-col gap-2">
+                <label class="text-purple-300 text-sm font-medium ml-2">ชื่อสคริปต์</label>
+                <input type="text" id="form-title" placeholder="เช่น Speed-Car" required
+                       class="w-full bg-[#0B0410] border border-purple-500/30 rounded-2xl px-6 py-4 text-white placeholder-purple-500/50 focus:border-purple-500 transition-colors">
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-purple-300 text-sm font-medium ml-2">อัปโหลดรูปภาพ</label>
+                <input type="file" id="form-image" accept="image/*" required
+                       class="w-full bg-[#0B0410] border border-purple-500/30 rounded-2xl px-6 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 transition-colors cursor-pointer">
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-purple-300 text-sm font-medium ml-2">โค้ดสคริปต์</label>
+<!-- ... existing code ... -->
+        function renderAdminList() {
+            const container = document.getElementById('admin-scripts-list');
+            if (scripts.length === 0) {
+                container.innerHTML = `<div class="glass p-8 rounded-[2rem] text-center text-purple-400/60">ยังไม่มีสคริปต์ในระบบ</div>`;
+                return;
+            }
+
+            container.innerHTML = scripts.map(script => `
+                <div class="glass p-4 rounded-[2rem] flex items-center justify-between gap-4 border border-purple-500/10 hover:border-purple-500/30 transition-colors">
+                    <div class="flex items-center gap-4 overflow-hidden w-full">
+                        <img src="${script.imageUrl}" class="w-16 h-16 rounded-2xl object-cover bg-[#0B0410] flex-shrink-0" onerror="this.src='https://placehold.co/100x100/150924/8b5cf6?text=Img'">
+                        <div class="truncate flex-grow">
+                            <h3 class="text-white font-bold truncate text-lg">${script.title}</h3>
+                            <p class="text-purple-400/70 text-sm">ยอดวิว: ${script.views || 0}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button onclick="openDetail('${script.id}')" class="w-12 h-12 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors shadow-sm" title="ดูสคริปต์">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <button onclick="openDeleteModal('${script.id}')" class="w-12 h-12 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors shadow-sm" title="ลบสคริปต์">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- STREAMING_CHUNK:Detail View Interactions ---
+<!-- ... existing code ... -->
+        els.addScriptForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isAdmin || !dbInitialized) {
+                showToast(dbInitialized ? 'กรุณาเข้าสู่ระบบก่อน' : 'ระบบออฟไลน์ ไม่สามารถเพิ่มได้', 'error');
+                return;
+            }
+
+            const title = document.getElementById('form-title').value.trim();
+            const imageFile = document.getElementById('form-image').files[0];
+            const content = document.getElementById('form-content').value.trim();
+            const btn = document.getElementById('submit-script-btn');
+
+            if (!title || !imageFile || !content) {
+                showToast('กรุณากรอกข้อมูลและแนบรูปให้ครบถ้วน', 'error');
+                return;
+            }
+
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            btn.disabled = true;
+
+            try {
+                // 1. อัปโหลดรูปไปที่ Firebase Storage
+                const storageRef = ref(storage, `script_images/${Date.now()}_${imageFile.name}`);
+                const snapshot = await uploadBytes(storageRef, imageFile);
+                const imageUrl = await getDownloadURL(snapshot.ref);
+
+                // 2. บันทึกข้อมูลลง Firestore (รวมลิงก์รูปที่อัปโหลดเสร็จแล้ว)
+                await addDoc(scriptsCollection, {
+                    title,
+                    imageUrl,
+                    content,
+                    views: 0,
+                    createdAt: Date.now()
+                });
+                
+                showToast('เพิ่มสคริปต์เรียบร้อยแล้ว!', 'success');
+                els.addScriptForm.reset();
+                switchView('home');
+            } catch (error) {
+                console.error("Error adding doc:", error);
+                showToast('อัปโหลดรูปไม่สำเร็จ (กรุณาเช็ค Storage Rules)', 'error');
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        });
+
+        // Event Listeners
+<!-- ... existing code ... -->
