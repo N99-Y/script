@@ -341,7 +341,6 @@
             }
         };
 
-        // ฟังก์ชันสำหรับออกจากระบบ Admin
         window.logoutAdmin = () => {
             isAdmin = false;
             els.floatBtnIcon.textContent = '⚙️';
@@ -361,10 +360,12 @@
                 scriptsCollection = collection(db, 'scripts');
                 
                 onSnapshot(scriptsCollection, (snapshot) => {
-                    scripts = [];
-                    snapshot.forEach(doc => scripts.push({ id: doc.id, ...doc.data() }));
+                    const loadedScripts = [];
+                    snapshot.forEach(doc => loadedScripts.push({ id: doc.id, ...doc.data() }));
                     
-                    if (scripts.length === 0) {
+                    if (loadedScripts.length > 0) {
+                        scripts = loadedScripts;
+                    } else if (scripts.length === 0) {
                         scripts = [...dummyScripts];
                     }
                     
@@ -480,7 +481,6 @@
             });
         });
 
-        // ระบบบันทึกข้อมูล
         els.addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -546,6 +546,7 @@
                 if (dbInitialized && !currentScriptId.startsWith('local_')) {
                     await deleteDoc(doc(db, 'scripts', currentScriptId));
                 }
+                // กรองข้อมูลออกจากหน้าจอทันที
                 scripts = scripts.filter(s => s.id !== currentScriptId);
                 updateUI();
                 showToast('ลบสคริปต์สำเร็จ', 'success');
