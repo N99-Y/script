@@ -152,15 +152,15 @@
 
     <!-- Floating Action Buttons Container -->
     <div class="fixed bottom-6 right-6 z-40 flex items-center gap-3">
-        <!-- Logout Button -->
-        <button id="logout-btn" onclick="logoutAdmin()" class="hidden glass hover:bg-red-950/50 text-red-300 px-4 py-3.5 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.2)] border border-red-500/40 transition-all active:scale-95">
-            <span class="text-sm font-semibold">ออกจากระบบ</span>
-        </button>
-
-        <!-- Floating Action Button -->
+        <!-- Floating Action Button (Admin/สร้าง) -->
         <button id="floating-btn" onclick="handleFloatingBtnClick()" class="glass hover:bg-blue-900/50 text-cyan-200 pl-4 pr-5 py-3.5 rounded-full flex items-center gap-2.5 shadow-[0_0_20px_rgba(34,211,238,0.2)] border border-blue-400/40 transition-all active:scale-95 group">
             <span id="floating-btn-icon" class="text-xl group-hover:rotate-12 transition-transform">⚙️</span>
             <span id="floating-btn-text" class="font-semibold tracking-wide">Admin</span>
+        </button>
+
+        <!-- Logout Button (ออกจากระบบ) -->
+        <button id="logout-btn" onclick="logoutAdmin()" class="hidden glass hover:bg-red-950/50 text-red-300 px-4 py-3.5 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.2)] border border-red-500/40 transition-all active:scale-95">
+            <span class="text-sm font-semibold">ออกจากระบบ</span>
         </button>
     </div>
 
@@ -374,7 +374,14 @@
         els.btnBack.addEventListener('click', () => switchView('home'));
 
         function updateUI(searchTerm = '') {
-            const filtered = scripts.filter(s => s.title.toLowerCase().includes(searchTerm.toLowerCase()));
+            // ทำให้คำค้นหาเป็นตัวเล็กทั้งหมด
+            const term = searchTerm.toLowerCase();
+            
+            // กรองข้อมูลโดยหาจากทั้ง "ชื่อสคริปต์" และ "รายละเอียด"
+            const filtered = scripts.filter(s => 
+                s.title.toLowerCase().includes(term) || 
+                (s.description || '').toLowerCase().includes(term)
+            );
             
             if (filtered.length === 0) {
                 els.grid.innerHTML = `<div class="col-span-full py-12 text-center text-blue-400/60 glass rounded-[2rem]">ไม่พบสคริปต์ที่ค้นหา</div>`;
