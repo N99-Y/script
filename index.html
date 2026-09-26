@@ -337,25 +337,32 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
                 
+                // ล็อกอินแบบระบุตัวตนอัตโนมัติ เพื่อผ่านระบบความปลอดภัยของ Firebase
                 await signInAnonymously(auth);
                 scriptsCollection = collection(db, 'scripts');
-                dbInitialized = true;
                 
+                // ทดสอบดึงข้อมูลเพื่อเช็คว่า Rules อนุญาตหรือยัง
                 onSnapshot(scriptsCollection, (snapshot) => {
                     scripts = [];
                     snapshot.forEach(doc => scripts.push({ id: doc.id, ...doc.data() }));
-                    // ถ้ายังไม่มีข้อมูลใน database ให้ใช้ข้อมูลจำลอง แต่ถ้ามีแล้วให้ใช้ของจริง
+                    
+                    // ถ้าในระบบยังไม่มีข้อมูล ให้แสดงตัวอย่างสคริปต์ไว้ก่อน
                     if (scripts.length === 0) {
                         scripts = [...dummyScripts];
                     }
+                    
                     scripts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
                     updateUI(els.searchInput.value);
+                    
+                    // ถ้าดึงข้อมูลสำเร็จและเชื่อมต่อได้จริง ให้เปลี่ยนป้ายสถานเป็น Online
+                    dbInitialized = true;
+                    els.dbStatus.innerHTML = `<span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Online</span>`;
                 }, (error) => {
-                    console.error("Firestore error:", error);
+                    // ถ้าติดปัญหาเรื่อง Rules ให้เปิดใช้งานระบบจำลองชั่วคราวเพื่อให้เว็บใช้งานได้ปกติ
+                    console.warn("Firestore Permission Notice:", error.message);
                     fallbackOffline();
                 });
 
-                els.dbStatus.innerHTML = `<span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-cyan-400 border border-blue-500/20"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>Ready</span>`;
             } catch (error) {
                 console.error("Firebase Init Error:", error);
                 fallbackOffline();
@@ -461,14 +468,10 @@
             });
         });
 
-        // ระบบบันทึกข้อมูลเข้า Database โดยตรงทันที ไม่ต้องตั้งค่า Storage และไม่ต้องแก้ Rules ใดๆ บนเว็บ Firebase
+        // ระบบบันทึกข้อมูลเข้า Database โดยตรงทันที
         els.addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!dbInitialized) {
-                showToast('กำลังเชื่อมต่อฐานข้อมูล กรุณารอสักครู่', 'error');
-                return;
-            }
-
+            
             const title = document.getElementById('form-title').value.trim();
             const description = document.getElementById('form-description').value.trim();
             const imageFile = document.getElementById('form-image').files[0];
@@ -490,12 +493,21 @@
                 try {
                     const imageUrl = reader.result;
 
-                    await addDoc(scriptsCollection, {
-                        title, description, imageUrl, content,
-                        views: 0, createdAt: Date.now()
-                    });
+                    // ถ้าต่อออนไลน์ได้ จะบันทึกเข้า Firebase จริงทันที
+                    if (dbInitialized) {
+                        await addDoc(scriptsCollection, {
+                            title, description, imageUrl, content,
+                            views: 0, createdAt: Date.now()
+                        });
+                        showToast('เพิ่มสคริปต์เรียบร้อย (ทุกคนเห็นแล้ว)!', 'success');
+                    } else {
+                        // ถ้ายังติด Test Mode จะบันทึกเก็บไว้ในเครื่องชั่วคราวเพื่อให้ใช้งานได้ต่อเนื่อง
+                        const newScript = { id: 'local_' + Date.now(), title, description, imageUrl, content, views: 0, createdAt: Date.now() };
+                        scripts.unshift(newScript);
+                        updateUI(els.searchInput.value);
+                        showToast('บันทึกจำลองในเครื่องเรียบร้อย!', 'success');
+                    }
                     
-                    showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
                     els.addForm.reset();
                     closeModal('modal-create');
                     window.scrollTo(0,0);
@@ -515,13 +527,18 @@
         });
 
         document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-            if (!currentScriptId || !dbInitialized) return;
+            if (!currentScriptId) return;
             const btn = document.getElementById('confirm-delete-btn');
             btn.textContent = 'กำลังลบ...';
             btn.disabled = true;
 
             try {
-                await deleteDoc(doc(db, 'scripts', currentScriptId));
+                if (dbInitialized && !currentScriptId.startsWith('local_')) {
+                    await deleteDoc(doc(db, 'scripts', currentScriptId));
+                } else {
+                    scripts = scripts.filter(s => s.id !== currentScriptId);
+                    updateUI();
+                }
                 showToast('ลบสคริปต์สำเร็จ', 'success');
                 switchView('home');
             } catch (error) {
