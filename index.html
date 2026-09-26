@@ -1,18 +1,279 @@
-<!-- ... existing code ... -->
-        <script type="module">
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-            import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-            import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-            import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nine Scripts Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #07020A;
+            color: #ffffff;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass {
+            background: rgba(18, 8, 28, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(139, 92, 246, 0.1);
+        }
+        /* ซ่อน Scrollbar แต่ยังเลื่อนได้ */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        
+        /* Animation สำหรับ Toast */
+        @keyframes slideInUp {
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .toast-animate {
+            animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen relative overflow-x-hidden">
 
-            // Firebase Configuration (Exact config provided by user)
-<!-- ... existing code ... -->
-        // Initialize Firebase
+    <!-- Background Elements -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[100px]"></div>
+    </div>
+
+    <!-- Top Bar (Back Button & Search) -->
+    <div class="sticky top-0 z-40 p-4 pt-6 glass border-b-0 rounded-b-[2rem]">
+        <div class="max-w-2xl mx-auto flex items-center gap-4">
+            <!-- ปุ่มลูกศรกลับ มุมซ้าย (ซ่อนในหน้าแรก) -->
+            <button id="btn-back" class="hidden w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full bg-purple-900/40 text-purple-300 hover:bg-purple-800 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            
+            <!-- ช่องค้นหา -->
+            <div class="relative flex-grow" id="search-container">
+                <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+                <input type="text" id="search-input" placeholder="ค้นหาสคริปต์ที่นี่..." 
+                       class="w-full bg-[#0B0410] border border-purple-500/30 rounded-full pl-12 pr-6 py-3.5 text-white placeholder-purple-500/50 focus:outline-none focus:border-purple-500 transition-colors">
+                
+                <!-- Status Badge -->
+                <div id="db-status" class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                    <span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                        Connecting...
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="max-w-2xl mx-auto p-4 pb-24 min-h-[80vh]">
+        
+        <!-- ================= HOME VIEW ================= -->
+        <div id="view-home" class="view-section block animate-fade-in">
+            <div class="flex items-center gap-3 mb-6 mt-4">
+                <div class="w-1.5 h-8 bg-purple-500 rounded-full"></div>
+                <h2 class="text-2xl font-bold text-white">แนะนำ สคริปต์</h2>
+            </div>
+            
+            <!-- Grid แสดงสคริปต์ -->
+            <div id="scripts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Data will be injected here -->
+                <div class="text-center py-10 text-purple-400/50 w-full col-span-full">กำลังโหลดข้อมูล...</div>
+            </div>
+        </div>
+
+        <!-- ================= DETAIL VIEW ================= -->
+        <div id="view-detail" class="view-section hidden animate-fade-in">
+            <div class="glass rounded-[2rem] overflow-hidden">
+                <img id="detail-image" src="" alt="Script Image" class="w-full h-48 md:h-64 object-cover bg-[#0B0410]">
+                
+                <div class="p-6">
+                    <div class="flex justify-between items-start gap-4 mb-6">
+                        <h1 id="detail-title" class="text-3xl font-bold text-white leading-tight">Title</h1>
+                        <div class="flex items-center gap-1.5 bg-[#0B0410] px-3 py-1.5 rounded-full border border-purple-500/20 flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span id="detail-views" class="text-purple-300 text-sm font-medium">0</span>
+                        </div>
+                    </div>
+
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-[2rem] opacity-20 blur"></div>
+                        <div class="relative bg-[#0B0410] rounded-[2rem] p-6 border border-purple-500/20">
+                            <pre><code id="detail-code" class="text-purple-200/80 font-mono text-sm whitespace-pre-wrap break-all"></code></pre>
+                            
+                            <button id="btn-copy" class="mt-6 w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white py-3.5 rounded-full font-medium transition-all active:scale-[0.98]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                                <span id="copy-text">คัดลอกสคริปต์</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ADMIN VIEW ================= -->
+        <div id="view-admin" class="view-section hidden animate-fade-in">
+            <div class="flex items-center gap-3 mb-6 mt-4">
+                <div class="w-1.5 h-8 bg-pink-500 rounded-full"></div>
+                <h2 class="text-2xl font-bold text-white">จัดการสคริปต์</h2>
+            </div>
+            
+            <!-- รายชื่อสคริปต์สำหรับจัดการ -->
+            <div class="mb-10">
+                <h3 class="text-purple-300 text-sm font-medium mb-3 ml-2">สคริปต์ทั้งหมดในระบบ</h3>
+                <div id="admin-scripts-list" class="flex flex-col gap-3">
+                    <!-- รายการจะถูกสร้างด้วย JS -->
+                </div>
+            </div>
+
+            <!-- ฟอร์มเพิ่มสคริปต์ใหม่ -->
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-1.5 h-8 bg-blue-500 rounded-full"></div>
+                <h2 class="text-xl font-bold text-white">เพิ่มสคริปต์ใหม่</h2>
+            </div>
+
+            <form id="add-script-form" class="glass p-6 md:p-8 rounded-[2.5rem] flex flex-col gap-5">
+                <div class="flex flex-col gap-2">
+                    <label class="text-purple-300 text-sm font-medium ml-2">ชื่อสคริปต์</label>
+                    <input type="text" id="form-title" placeholder="เช่น Speed-Car" required
+                           class="w-full bg-[#0B0410] border border-purple-500/30 rounded-[1.5rem] px-6 py-4 text-white placeholder-purple-500/50 focus:border-purple-500 transition-colors outline-none">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="text-purple-300 text-sm font-medium ml-2">อัปโหลดรูปภาพปก</label>
+                    <input type="file" id="form-image" accept="image/*" required
+                           class="w-full bg-[#0B0410] border border-purple-500/30 rounded-[1.5rem] px-6 py-3 text-white file:mr-4 file:py-2.5 file:px-5 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 transition-colors cursor-pointer outline-none">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="text-purple-300 text-sm font-medium ml-2">โค้ดสคริปต์</label>
+                    <textarea id="form-content" placeholder="วางโค้ดสคริปต์ที่นี่..." rows="6" required
+                              class="w-full bg-[#0B0410] border border-purple-500/30 rounded-[1.5rem] px-6 py-4 text-white placeholder-purple-500/50 focus:border-purple-500 transition-colors outline-none font-mono text-sm"></textarea>
+                </div>
+
+                <button type="submit" id="submit-script-btn" class="mt-4 w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 rounded-full transition-all active:scale-[0.98] shadow-lg shadow-purple-900/20">
+                    บันทึกสคริปต์
+                </button>
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Floating Admin Button -->
+    <button onclick="openAdminLogin()" class="fixed bottom-6 right-6 z-40 glass hover:bg-purple-900/50 text-purple-200 pl-4 pr-5 py-3 rounded-full flex items-center gap-2 shadow-xl border border-purple-500/30 transition-all active:scale-95">
+        <span class="text-xl">⚙️</span>
+        <span class="font-medium tracking-wide">Admin</span>
+    </button>
+
+    <!-- Admin Login Modal -->
+    <div id="modal-login" class="fixed inset-0 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300 px-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeAdminLogin()"></div>
+        <div class="relative glass bg-[#0f0716] p-8 rounded-[2.5rem] w-full max-w-sm border border-purple-500/30 text-center transform scale-95 transition-transform duration-300" id="modal-login-content">
+            <div class="w-16 h-16 bg-purple-900/40 rounded-full flex items-center justify-center mx-auto mb-4 border border-purple-500/20">
+                <span class="text-3xl">🔒</span>
+            </div>
+            <h3 class="text-2xl font-bold text-white mb-2">Admin Access</h3>
+            <p class="text-purple-400 text-sm mb-6">กรุณากรอกรหัสผ่านเพื่อเข้าสู่ระบบ</p>
+            
+            <input type="password" id="admin-pin" placeholder="รหัสผ่าน (ตัวเลขเท่านั้น)" inputmode="numeric"
+                   class="w-full bg-[#0B0410] text-center tracking-[0.5em] text-xl font-mono border border-purple-500/30 rounded-[1.5rem] px-6 py-4 text-white focus:border-purple-500 transition-colors outline-none mb-4">
+            
+            <button onclick="verifyAdmin()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-full transition-all active:scale-[0.98]">
+                เข้าสู่ระบบ
+            </button>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div id="modal-delete" class="fixed inset-0 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300 px-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeDeleteModal()"></div>
+        <div class="relative glass bg-[#0f0716] p-8 rounded-[2.5rem] w-full max-w-sm border border-red-500/30 text-center" id="modal-delete-content">
+            <div class="w-16 h-16 bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                <span class="text-3xl">🗑️</span>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">ยืนยันการลบ?</h3>
+            <p class="text-red-300/80 text-sm mb-6">สคริปต์นี้จะถูกลบออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้</p>
+            
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 bg-[#0B0410] border border-purple-500/30 hover:bg-purple-900/30 text-white font-medium py-3 rounded-full transition-colors">
+                    ยกเลิก
+                </button>
+                <button id="confirm-delete-btn" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-full transition-colors">
+                    ลบเลย
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+
+    <!-- ================= FIREBASE & LOGIC ================= -->
+    <script type="module">
+        // Import Firebase v11
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // คอนฟิก Firebase ของคุณ
+        const firebaseConfig = {
+            apiKey: "AIzaSyAeZR6ekLRK5mKo--yGdzCJUpKN4pHPHOI",
+            authDomain: "nine-3.firebaseapp.com",
+            projectId: "nine-3",
+            storageBucket: "nine-3.firebasestorage.app",
+            messagingSenderId: "48384856235",
+            appId: "1:48384856235:web:03650c3de8c6e5473167ee",
+            measurementId: "G-H4LZ072B05"
+        };
+
+        // ตัวแปรระบบ
         let app, auth, db, storage, scriptsCollection;
         let dbInitialized = false;
+        let scripts = [];
+        let currentScriptId = null;
+        let scriptToDelete = null;
+        let isAdmin = false;
 
-        // App State
-<!-- ... existing code ... -->
+        // ข้อมูลจำลองเผื่อออฟไลน์
+        const dummyScripts = [
+            { id: '1', title: 'Speed-Car', imageUrl: 'https://placehold.co/600x400/150924/8b5cf6?text=Speed-Car', content: 'loadstring(game:HttpGet("https://raw.githubusercontent.com/speedcar"))()', views: 99, createdAt: 1 },
+            { id: '2', title: 'Auto-Farm OP', imageUrl: 'https://placehold.co/600x400/150924/8b5cf6?text=Auto-Farm', content: 'loadstring(game:HttpGet("https://raw.githubusercontent.com/autofarm"))()', views: 450, createdAt: 2 }
+        ];
+
+        // Elements
+        const els = {
+            views: {
+                home: document.getElementById('view-home'),
+                detail: document.getElementById('view-detail'),
+                admin: document.getElementById('view-admin')
+            },
+            btnBack: document.getElementById('btn-back'),
+            searchContainer: document.getElementById('search-container'),
+            searchInput: document.getElementById('search-input'),
+            grid: document.getElementById('scripts-grid'),
+            dbStatus: document.getElementById('db-status'),
+            addScriptForm: document.getElementById('add-script-form'),
+            adminList: document.getElementById('admin-scripts-list')
+        };
+
+        // สร้าง Global Functions สำหรับปุ่มใน HTML
+        window.openDetail = (id) => openDetail(id);
+        window.openAdminLogin = () => { document.getElementById('modal-login').classList.remove('hidden'); setTimeout(()=> { document.getElementById('modal-login').classList.remove('opacity-0'); document.getElementById('modal-login-content').classList.remove('scale-95'); document.getElementById('admin-pin').value = ''; document.getElementById('admin-pin').focus(); }, 10); };
+        window.closeAdminLogin = () => { document.getElementById('modal-login').classList.add('opacity-0'); document.getElementById('modal-login-content').classList.add('scale-95'); setTimeout(()=> document.getElementById('modal-login').classList.add('hidden'), 300); };
+        window.verifyAdmin = () => verifyAdmin();
+        window.openDeleteModal = (id) => { scriptToDelete = id; document.getElementById('modal-delete').classList.remove('hidden'); setTimeout(()=> document.getElementById('modal-delete').classList.remove('opacity-0'), 10); };
+        window.closeDeleteModal = () => { scriptToDelete = null; document.getElementById('modal-delete').classList.add('opacity-0'); setTimeout(()=> document.getElementById('modal-delete').classList.add('hidden'), 300); };
+
+        // ฟอร์ซให้พิมพ์ได้แค่ตัวเลขในช่องรหัสผ่าน
+        document.getElementById('admin-pin').addEventListener('input', function (e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+
+        // Initialize Firebase
         async function initFirebase() {
             try {
                 app = initializeApp(firebaseConfig);
@@ -20,57 +281,177 @@
                 db = getFirestore(app);
                 storage = getStorage(app);
                 
-                // Authenticate anonymously to access Firestore
-<!-- ... existing code ... -->
-            <div class="flex flex-col gap-2">
-                <label class="text-purple-300 text-sm font-medium ml-2">ชื่อสคริปต์</label>
-                <input type="text" id="form-title" placeholder="เช่น Speed-Car" required
-                       class="w-full bg-[#0B0410] border border-purple-500/30 rounded-2xl px-6 py-4 text-white placeholder-purple-500/50 focus:border-purple-500 transition-colors">
-            </div>
+                await signInAnonymously(auth);
+                scriptsCollection = collection(db, 'scripts');
+                dbInitialized = true;
+                
+                // Realtime Listener
+                onSnapshot(scriptsCollection, (snapshot) => {
+                    scripts = [];
+                    snapshot.forEach(doc => {
+                        scripts.push({ id: doc.id, ...doc.data() });
+                    });
+                    // เรียงสคริปต์ล่าสุดขึ้นก่อน
+                    scripts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    updateUI();
+                }, (error) => {
+                    console.error("Firestore error:", error);
+                    fallbackOffline();
+                });
 
-            <div class="flex flex-col gap-2">
-                <label class="text-purple-300 text-sm font-medium ml-2">อัปโหลดรูปภาพ</label>
-                <input type="file" id="form-image" accept="image/*" required
-                       class="w-full bg-[#0B0410] border border-purple-500/30 rounded-2xl px-6 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 transition-colors cursor-pointer">
-            </div>
+                els.dbStatus.innerHTML = `<span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Online</span>`;
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                fallbackOffline();
+            }
+        }
 
-            <div class="flex flex-col gap-2">
-                <label class="text-purple-300 text-sm font-medium ml-2">โค้ดสคริปต์</label>
-<!-- ... existing code ... -->
-        function renderAdminList() {
-            const container = document.getElementById('admin-scripts-list');
-            if (scripts.length === 0) {
-                container.innerHTML = `<div class="glass p-8 rounded-[2rem] text-center text-purple-400/60">ยังไม่มีสคริปต์ในระบบ</div>`;
+        function fallbackOffline() {
+            dbInitialized = false;
+            scripts = [...dummyScripts];
+            els.dbStatus.innerHTML = `<span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Test Mode</span>`;
+            updateUI();
+        }
+
+        // View Router
+        function switchView(viewName) {
+            Object.values(els.views).forEach(v => v.classList.add('hidden'));
+            els.views[viewName].classList.remove('hidden');
+            
+            if (viewName === 'home') {
+                els.btnBack.classList.add('hidden');
+                els.searchContainer.classList.remove('hidden');
+                window.scrollTo(0,0);
+            } else {
+                els.btnBack.classList.remove('hidden');
+                els.searchContainer.classList.add('hidden');
+            }
+
+            if (viewName === 'admin') {
+                renderAdminList();
+            }
+        }
+
+        els.btnBack.addEventListener('click', () => switchView('home'));
+
+        // Render Home Grid
+        function updateUI(searchTerm = '') {
+            const filtered = scripts.filter(s => s.title.toLowerCase().includes(searchTerm.toLowerCase()));
+            
+            if (filtered.length === 0) {
+                els.grid.innerHTML = `<div class="col-span-full py-12 text-center text-purple-400/60 glass rounded-[2rem]">ไม่พบสคริปต์ที่ค้นหา</div>`;
                 return;
             }
 
-            container.innerHTML = scripts.map(script => `
+            els.grid.innerHTML = filtered.map(script => `
+                <div onclick="openDetail('${script.id}')" class="glass rounded-[2rem] overflow-hidden cursor-pointer group hover:border-purple-500/50 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-900/20">
+                    <div class="h-32 overflow-hidden bg-[#0B0410]">
+                        <img src="${script.imageUrl}" loading="lazy" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" onerror="this.src='https://placehold.co/600x400/150924/8b5cf6?text=Image'">
+                    </div>
+                    <div class="p-5 flex justify-between items-center bg-gradient-to-t from-[#0B0410] to-transparent">
+                        <h3 class="text-lg font-bold text-white truncate pr-2 group-hover:text-purple-300 transition-colors">${script.title}</h3>
+                        <div class="flex items-center gap-1.5 bg-purple-900/40 px-2.5 py-1 rounded-full flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span class="text-xs font-medium text-purple-200">${script.views || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // อัปเดตหน้า Admin ทันทีถ้าเปิดอยู่
+            if(!els.views.admin.classList.contains('hidden')) {
+                renderAdminList();
+            }
+        }
+
+        // Render Admin List
+        function renderAdminList() {
+            if (scripts.length === 0) {
+                els.adminList.innerHTML = `<div class="glass p-8 rounded-[2rem] text-center text-purple-400/60">ยังไม่มีสคริปต์ในระบบ</div>`;
+                return;
+            }
+
+            els.adminList.innerHTML = scripts.map(script => `
                 <div class="glass p-4 rounded-[2rem] flex items-center justify-between gap-4 border border-purple-500/10 hover:border-purple-500/30 transition-colors">
                     <div class="flex items-center gap-4 overflow-hidden w-full">
-                        <img src="${script.imageUrl}" class="w-16 h-16 rounded-2xl object-cover bg-[#0B0410] flex-shrink-0" onerror="this.src='https://placehold.co/100x100/150924/8b5cf6?text=Img'">
+                        <img src="${script.imageUrl}" class="w-14 h-14 rounded-2xl object-cover bg-[#0B0410] flex-shrink-0 border border-purple-500/20" onerror="this.src='https://placehold.co/100x100/150924/8b5cf6?text=Img'">
                         <div class="truncate flex-grow">
-                            <h3 class="text-white font-bold truncate text-lg">${script.title}</h3>
-                            <p class="text-purple-400/70 text-sm">ยอดวิว: ${script.views || 0}</p>
+                            <h3 class="text-white font-bold truncate">${script.title}</h3>
+                            <p class="text-purple-400/70 text-xs mt-0.5">ยอดวิว: ${script.views || 0}</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 flex-shrink-0">
-                        <button onclick="openDetail('${script.id}')" class="w-12 h-12 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors shadow-sm" title="ดูสคริปต์">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <button onclick="openDetail('${script.id}')" class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors" title="ดูสคริปต์">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
-                        <button onclick="openDeleteModal('${script.id}')" class="w-12 h-12 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors shadow-sm" title="ลบสคริปต์">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        <button onclick="openDeleteModal('${script.id}')" class="w-10 h-10 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors" title="ลบสคริปต์">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                         </button>
                     </div>
                 </div>
             `).join('');
         }
 
-        // --- STREAMING_CHUNK:Detail View Interactions ---
-<!-- ... existing code ... -->
+        // Search Input Event
+        els.searchInput.addEventListener('input', (e) => {
+            updateUI(e.target.value);
+        });
+
+        // Detail View Flow
+        async function openDetail(id) {
+            const script = scripts.find(s => s.id === id);
+            if (!script) return;
+            
+            currentScriptId = id;
+            document.getElementById('detail-image').src = script.imageUrl;
+            document.getElementById('detail-title').textContent = script.title;
+            document.getElementById('detail-views').textContent = (script.views || 0) + (dbInitialized ? 1 : 0);
+            document.getElementById('detail-code').textContent = script.content;
+            
+            document.getElementById('copy-text').textContent = 'คัดลอกสคริปต์';
+            document.getElementById('btn-copy').classList.replace('bg-green-600', 'bg-purple-600');
+            
+            switchView('detail');
+
+            // เพิ่มยอดวิวในฐานข้อมูล
+            if (dbInitialized) {
+                try {
+                    const scriptRef = doc(db, 'scripts', id);
+                    await updateDoc(scriptRef, { views: increment(1) });
+                } catch (e) { console.error("View increment error", e); }
+            }
+        }
+
+        // Copy Button Event
+        document.getElementById('btn-copy').addEventListener('click', () => {
+            const code = document.getElementById('detail-code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.getElementById('btn-copy');
+                document.getElementById('copy-text').textContent = 'คัดลอกแล้ว!';
+                btn.classList.replace('bg-purple-600', 'bg-green-600');
+                showToast('คัดลอกสคริปต์สำเร็จ!', 'success');
+            }).catch(() => showToast('คัดลอกล้มเหลว', 'error'));
+        });
+
+        // Admin Auth Flow
+        function verifyAdmin() {
+            const pin = document.getElementById('admin-pin').value;
+            if (pin === '210757') {
+                isAdmin = true;
+                window.closeAdminLogin();
+                switchView('admin');
+                showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
+            } else {
+                showToast('รหัสผ่านไม่ถูกต้อง', 'error');
+                document.getElementById('admin-pin').value = '';
+            }
+        }
+
+        // เพิ่มสคริปต์ใหม่ (อัปโหลดรูป + บันทึกข้อมูล)
         els.addScriptForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!isAdmin || !dbInitialized) {
-                showToast(dbInitialized ? 'กรุณาเข้าสู่ระบบก่อน' : 'ระบบออฟไลน์ ไม่สามารถเพิ่มได้', 'error');
+                showToast(dbInitialized ? 'กรุณาเข้าสู่ระบบก่อน' : 'ระบบทดสอบ ไม่สามารถบันทึกข้อมูลจริงได้', 'error');
                 return;
             }
 
@@ -80,21 +461,21 @@
             const btn = document.getElementById('submit-script-btn');
 
             if (!title || !imageFile || !content) {
-                showToast('กรุณากรอกข้อมูลและแนบรูปให้ครบถ้วน', 'error');
+                showToast('กรุณากรอกข้อมูลและแนบรูปให้ครบ', 'error');
                 return;
             }
 
             const originalHTML = btn.innerHTML;
-            btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            btn.innerHTML = `<svg class="animate-spin h-6 w-6 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
             btn.disabled = true;
 
             try {
-                // 1. อัปโหลดรูปไปที่ Firebase Storage
-                const storageRef = ref(storage, `script_images/${Date.now()}_${imageFile.name}`);
+                // อัปโหลดรูปลง Storage
+                const storageRef = ref(storage, `covers/${Date.now()}_${imageFile.name}`);
                 const snapshot = await uploadBytes(storageRef, imageFile);
                 const imageUrl = await getDownloadURL(snapshot.ref);
 
-                // 2. บันทึกข้อมูลลง Firestore (รวมลิงก์รูปที่อัปโหลดเสร็จแล้ว)
+                // บันทึกข้อมูลลง Database
                 await addDoc(scriptsCollection, {
                     title,
                     imageUrl,
@@ -103,17 +484,65 @@
                     createdAt: Date.now()
                 });
                 
-                showToast('เพิ่มสคริปต์เรียบร้อยแล้ว!', 'success');
+                showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
                 els.addScriptForm.reset();
-                switchView('home');
+                window.scrollTo(0,0);
             } catch (error) {
                 console.error("Error adding doc:", error);
-                showToast('อัปโหลดรูปไม่สำเร็จ (กรุณาเช็ค Storage Rules)', 'error');
+                showToast('บันทึกไม่สำเร็จ (เช็ค Storage Rules)', 'error');
             } finally {
                 btn.innerHTML = originalHTML;
                 btn.disabled = false;
             }
         });
 
-        // Event Listeners
-<!-- ... existing code ... -->
+        // ลบสคริปต์
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            if (!scriptToDelete || !dbInitialized) {
+                window.closeDeleteModal();
+                showToast('ไม่สามารถลบในโหมดออฟไลน์ได้', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('confirm-delete-btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'กำลังลบ...';
+            btn.disabled = true;
+
+            try {
+                await deleteDoc(doc(db, 'scripts', scriptToDelete));
+                showToast('ลบสคริปต์สำเร็จ', 'success');
+            } catch (error) {
+                console.error("Error deleting:", error);
+                showToast('ลบไม่สำเร็จ', 'error');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+                window.closeDeleteModal();
+            }
+        });
+
+        // ระบบแจ้งเตือน (Toast)
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colorClass = type === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-300' : 'bg-red-500/20 border-red-500/50 text-red-300';
+            
+            toast.className = `glass border ${colorClass} px-5 py-3 rounded-full shadow-lg flex items-center gap-2 toast-animate mb-2 pointer-events-auto`;
+            toast.innerHTML = `<span class="text-sm font-medium">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translate(-50%, 100%)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // เริ่มต้นการทำงาน
+        initFirebase();
+    </script>
+</body>
+</html>
