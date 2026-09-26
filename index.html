@@ -63,7 +63,7 @@
                        class="w-full bg-[#0B1221] border border-blue-500/30 rounded-full pl-12 pr-6 py-3.5 text-white placeholder-blue-500/50 focus:outline-none focus:border-cyan-400 transition-colors shadow-inner">
                 
                 <div id="db-status" class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                    <span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-cyan-400 border border-blue-500/20">
+                    <span class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                         <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
                         Ready
                     </span>
@@ -152,7 +152,7 @@
 
     <!-- Floating Action Buttons Container -->
     <div class="fixed bottom-6 right-6 z-40 flex items-center gap-3">
-        <!-- Logout Button (แสดงเฉพาะตอนเป็น Admin) -->
+        <!-- Logout Button -->
         <button id="logout-btn" onclick="logoutAdmin()" class="hidden glass hover:bg-red-950/50 text-red-300 px-4 py-3.5 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.2)] border border-red-500/40 transition-all active:scale-95">
             <span class="text-sm font-semibold">ออกจากระบบ</span>
         </button>
@@ -254,32 +254,36 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 10px; }
     </style>
 
-    <!-- ================= FIREBASE & LOGIC ================= -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAeZR6ekLRK5mKo--yGdzCJUpKN4pHPHOI",
-            authDomain: "nine-3.firebaseapp.com",
-            projectId: "nine-3",
-            storageBucket: "nine-3.firebasestorage.app",
-            messagingSenderId: "48384856235",
-            appId: "1:48384856235:web:03650c3de8c6e5473167ee",
-            measurementId: "G-H4LZ072B05"
-        };
-
-        let app, auth, db, scriptsCollection;
-        let dbInitialized = false;
+    <!-- ================= LOCAL STORAGE & LOGIC ================= -->
+    <script>
         let scripts = [];
         let currentScriptId = null;
         let isAdmin = false;
 
-        const dummyScripts = [
+        const defaultScripts = [
             { id: '1', title: 'Speed-Car', description: 'สคริปต์ฟาร์มเร็วสุดๆ โหลดลื่นไม่มีสะดุด', imageUrl: 'https://placehold.co/600x400/0f172a/38bdf8?text=Speed-Car', content: 'loadstring(game:HttpGet("https://raw.githubusercontent.com/speedcar"))()', views: 99, createdAt: 1 },
             { id: '2', title: 'Auto-Farm OP', description: 'ตีออโต้ระดับเทพ ฟาร์มไวข้ามคืน', imageUrl: 'https://placehold.co/600x400/0f172a/38bdf8?text=Auto-Farm', content: 'loadstring(game:HttpGet("https://raw.githubusercontent.com/autofarm"))()', views: 450, createdAt: 2 }
         ];
+
+        // โหลดข้อมูลจากความจำเครื่อง (LocalStorage)
+        function loadScripts() {
+            const saved = localStorage.getItem('nine_scripts');
+            if (saved) {
+                try {
+                    scripts = JSON.parse(saved);
+                } catch (e) {
+                    scripts = [...defaultScripts];
+                }
+            } else {
+                scripts = [...defaultScripts];
+                saveScripts();
+            }
+            updateUI(document.getElementById('search-input').value);
+        }
+
+        function saveScripts() {
+            localStorage.setItem('nine_scripts', JSON.stringify(scripts));
+        }
 
         const els = {
             viewHome: document.getElementById('view-home'),
@@ -288,7 +292,6 @@
             searchContainer: document.getElementById('search-container'),
             searchInput: document.getElementById('search-input'),
             grid: document.getElementById('scripts-grid'),
-            dbStatus: document.getElementById('db-status'),
             addForm: document.getElementById('add-script-form'),
             floatBtnIcon: document.getElementById('floating-btn-icon'),
             floatBtnText: document.getElementById('floating-btn-text'),
@@ -350,45 +353,6 @@
             showToast('ออกจากระบบ Admin แล้ว', 'success');
         };
 
-        async function initFirebase() {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                await signInAnonymously(auth);
-                scriptsCollection = collection(db, 'scripts');
-                
-                onSnapshot(scriptsCollection, (snapshot) => {
-                    const loadedScripts = [];
-                    snapshot.forEach(doc => loadedScripts.push({ id: doc.id, ...doc.data() }));
-                    
-                    if (loadedScripts.length > 0) {
-                        scripts = loadedScripts;
-                    } else if (scripts.length === 0) {
-                        scripts = [...dummyScripts];
-                    }
-                    
-                    scripts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                    updateUI(els.searchInput.value);
-                    dbInitialized = true;
-                }, (error) => {
-                    fallbackOffline();
-                });
-
-            } catch (error) {
-                fallbackOffline();
-            }
-        }
-
-        function fallbackOffline() {
-            dbInitialized = false;
-            if (scripts.length === 0) {
-                scripts = [...dummyScripts];
-            }
-            updateUI();
-        }
-
         function switchView(viewName) {
             els.viewHome.classList.add('hidden');
             els.viewDetail.classList.add('hidden');
@@ -439,7 +403,7 @@
 
         els.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
 
-        window.openDetail = async (id) => {
+        window.openDetail = (id) => {
             const script = scripts.find(s => s.id === id);
             if (!script) return;
             
@@ -450,6 +414,9 @@
             document.getElementById('detail-views').textContent = (script.views || 0) + 1;
             document.getElementById('detail-code').textContent = script.content;
             
+            script.views = (script.views || 0) + 1;
+            saveScripts();
+
             document.getElementById('copy-text').textContent = 'คัดลอกสคริปต์';
             document.getElementById('btn-copy').className = 'mt-6 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white py-3.5 rounded-full font-medium transition-all active:scale-[0.98] shadow-lg shadow-blue-900/30';
             
@@ -462,13 +429,6 @@
             }
 
             switchView('detail');
-
-            if (dbInitialized && !id.startsWith('local_')) {
-                try {
-                    const scriptRef = doc(db, 'scripts', id);
-                    await updateDoc(scriptRef, { views: increment(1) });
-                } catch (e) {}
-            }
         };
 
         document.getElementById('btn-copy').addEventListener('click', () => {
@@ -481,7 +441,8 @@
             });
         });
 
-        els.addForm.addEventListener('submit', async (e) => {
+        // ระบบบันทึกข้อมูลลงเครื่อง
+        els.addForm.addEventListener('submit', (e) => {
             e.preventDefault();
             
             const title = document.getElementById('form-title').value.trim();
@@ -501,28 +462,24 @@
 
             const reader = new FileReader();
             reader.readAsDataURL(imageFile);
-            reader.onload = async function () {
+            reader.onload = function () {
                 try {
                     const imageUrl = reader.result;
+                    const newScript = {
+                        id: 'script_' + Date.now(),
+                        title, description, imageUrl, content,
+                        views: 0, createdAt: Date.now()
+                    };
 
-                    if (dbInitialized) {
-                        await addDoc(scriptsCollection, {
-                            title, description, imageUrl, content,
-                            views: 0, createdAt: Date.now()
-                        });
-                        showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
-                    } else {
-                        const newScript = { id: 'local_' + Date.now(), title, description, imageUrl, content, views: 0, createdAt: Date.now() };
-                        scripts.unshift(newScript);
-                        updateUI(els.searchInput.value);
-                        showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
-                    }
+                    scripts.unshift(newScript);
+                    saveScripts();
+                    updateUI(els.searchInput.value);
                     
+                    showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
                     els.addForm.reset();
                     closeModal('modal-create');
                     window.scrollTo(0,0);
                 } catch (error) {
-                    console.error("Error adding doc:", error);
                     showToast('บันทึกไม่สำเร็จ (รูปมีขนาดใหญ่เกินไป)', 'error');
                 } finally {
                     btn.innerHTML = originalHTML;
@@ -536,28 +493,15 @@
             };
         });
 
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+        document.getElementById('confirm-delete-btn').addEventListener('click', () => {
             if (!currentScriptId) return;
-            const btn = document.getElementById('confirm-delete-btn');
-            btn.textContent = 'กำลังลบ...';
-            btn.disabled = true;
-
-            try {
-                if (dbInitialized && !currentScriptId.startsWith('local_')) {
-                    await deleteDoc(doc(db, 'scripts', currentScriptId));
-                }
-                // กรองข้อมูลออกจากหน้าจอทันที
-                scripts = scripts.filter(s => s.id !== currentScriptId);
-                updateUI();
-                showToast('ลบสคริปต์สำเร็จ', 'success');
-                switchView('home');
-            } catch (error) {
-                showToast('ลบไม่สำเร็จ', 'error');
-            } finally {
-                btn.textContent = 'ลบเลย';
-                btn.disabled = false;
-                closeModal('modal-delete');
-            }
+            
+            scripts = scripts.filter(s => s.id !== currentScriptId);
+            saveScripts();
+            updateUI();
+            showToast('ลบสคริปต์สำเร็จ', 'success');
+            switchView('home');
+            closeModal('modal-delete');
         });
 
         function showToast(message, type = 'success') {
@@ -575,7 +519,7 @@
             }, 3000);
         }
 
-        initFirebase();
+        loadScripts();
     </script>
 </body>
 </html>
