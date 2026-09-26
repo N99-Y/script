@@ -133,7 +133,6 @@
 
     <!-- Footer / ME Section -->
     <footer class="max-w-2xl mx-auto px-4 mt-12 mb-6">
-        <!-- เส้นกั้นแนวนอนแบ่งชัดเจน -->
         <div class="w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500/40 to-transparent mb-6"></div>
         
         <div class="flex flex-col items-center gap-3">
@@ -151,7 +150,7 @@
         </div>
     </footer>
 
-    <!-- Floating Action Button (Admin / Create) -->
+    <!-- Floating Action Button -->
     <button id="floating-btn" onclick="handleFloatingBtnClick()" class="fixed bottom-6 right-6 z-40 glass hover:bg-blue-900/50 text-cyan-200 pl-4 pr-5 py-3.5 rounded-full flex items-center gap-2.5 shadow-[0_0_20px_rgba(34,211,238,0.2)] border border-blue-400/40 transition-all active:scale-95 group">
         <span id="floating-btn-icon" class="text-xl group-hover:rotate-12 transition-transform">⚙️</span>
         <span id="floating-btn-text" class="font-semibold tracking-wide">Admin</span>
@@ -252,7 +251,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAeZR6ekLRK5mKo--yGdzCJUpKN4pHPHOI",
@@ -264,7 +262,7 @@
             measurementId: "G-H4LZ072B05"
         };
 
-        let app, auth, db, storage, scriptsCollection;
+        let app, auth, db, scriptsCollection;
         let dbInitialized = false;
         let scripts = [];
         let currentScriptId = null;
@@ -338,7 +336,6 @@
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
-                storage = getStorage(app);
                 
                 await signInAnonymously(auth);
                 scriptsCollection = collection(db, 'scripts');
@@ -460,6 +457,7 @@
             });
         });
 
+        // บันทึกสคริปต์พร้อมแปลงรูปเป็น Base64 (ไม่ต้องพึ่ง Storage)
         els.addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!isAdmin || !dbInitialized) {
@@ -473,30 +471,43 @@
             const content = document.getElementById('form-content').value.trim();
             const btn = document.getElementById('submit-script-btn');
 
+            if (!imageFile) {
+                showToast('กรุณาเลือกรูปภาพ', 'error');
+                return;
+            }
+
             const originalHTML = btn.innerHTML;
             btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
             btn.disabled = true;
 
-            try {
-                const storageRef = ref(storage, `covers/${Date.now()}_${imageFile.name}`);
-                const snapshot = await uploadBytes(storageRef, imageFile);
-                const imageUrl = await getDownloadURL(snapshot.ref);
+            const reader = new FileReader();
+            reader.readAsDataURL(imageFile);
+            reader.onload = async function () {
+                try {
+                    const imageUrl = reader.result; // แปลงรูปเป็น Base64 สำเร็จ
 
-                await addDoc(scriptsCollection, {
-                    title, description, imageUrl, content,
-                    views: 0, createdAt: Date.now()
-                });
-                
-                showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
-                els.addForm.reset();
-                closeModal('modal-create');
-                window.scrollTo(0,0);
-            } catch (error) {
-                showToast('บันทึกไม่สำเร็จ', 'error');
-            } finally {
+                    await addDoc(scriptsCollection, {
+                        title, description, imageUrl, content,
+                        views: 0, createdAt: Date.now()
+                    });
+                    
+                    showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
+                    els.addForm.reset();
+                    closeModal('modal-create');
+                    window.scrollTo(0,0);
+                } catch (error) {
+                    console.error("Error adding doc:", error);
+                    showToast('บันทึกไม่สำเร็จ', 'error');
+                } finally {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }
+            };
+            reader.onerror = function () {
+                showToast('อ่านไฟล์รูปภาพไม่สำเร็จ', 'error');
                 btn.innerHTML = originalHTML;
                 btn.disabled = false;
-            }
+            };
         });
 
         document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
