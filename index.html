@@ -265,7 +265,6 @@
             { id: '2', title: 'Auto-Farm OP', description: 'ตีออโต้ระดับเทพ ฟาร์มไวข้ามคืน', imageUrl: 'https://placehold.co/600x400/0f172a/38bdf8?text=Auto-Farm', content: 'loadstring(game:HttpGet("https://raw.githubusercontent.com/autofarm"))()', views: 450, createdAt: 2 }
         ];
 
-        // โหลดข้อมูลจากความจำเครื่อง (LocalStorage)
         function loadScripts() {
             const saved = localStorage.getItem('nine_scripts');
             if (saved) {
@@ -279,6 +278,18 @@
                 saveScripts();
             }
             updateUI(document.getElementById('search-input').value);
+
+            // เช็คว่ามีลิงก์แชร์ส่งมาหรือไม่ (เช่น ?s=Nine)
+            const urlParams = new URLSearchParams(window.location.search);
+            const sharedTitle = urlParams.get('s');
+            if (sharedTitle) {
+                const found = scripts.find(s => s.title.toLowerCase() === sharedTitle.toLowerCase());
+                if (found) {
+                    setTimeout(() => openDetail(found.id, true), 100); // true เพื่อไม่ต้องแก้ URL ซ้ำ
+                } else {
+                    setTimeout(() => showToast('ไม่พบสคริปต์จากลิงก์', 'error'), 500);
+                }
+            }
         }
 
         function saveScripts() {
@@ -353,7 +364,7 @@
             showToast('ออกจากระบบ Admin แล้ว', 'success');
         };
 
-        function switchView(viewName) {
+        function switchView(viewName, isPopState = false) {
             els.viewHome.classList.add('hidden');
             els.viewDetail.classList.add('hidden');
             
@@ -363,6 +374,11 @@
                 els.searchContainer.classList.remove('hidden');
                 document.querySelector('.fixed.bottom-6.right-6').classList.remove('hidden');
                 window.scrollTo(0,0);
+                
+                // คืนค่า URL กลับเป็นหน้าแรกเวลาออก
+                if (!isPopState) {
+                    window.history.pushState(null, '', window.location.pathname);
+                }
             } else {
                 els.viewDetail.classList.remove('hidden');
                 els.btnBack.classList.remove('hidden');
@@ -373,11 +389,20 @@
 
         els.btnBack.addEventListener('click', () => switchView('home'));
 
+        // ระบบให้ปุ่ม Back ของมือถือใช้งานได้สมจริง
+        window.addEventListener('popstate', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sharedTitle = urlParams.get('s');
+            if (sharedTitle) {
+                const found = scripts.find(s => s.title.toLowerCase() === sharedTitle.toLowerCase());
+                if (found) openDetail(found.id, true);
+            } else {
+                switchView('home', true);
+            }
+        });
+
         function updateUI(searchTerm = '') {
-            // ทำให้คำค้นหาเป็นตัวเล็กทั้งหมด
             const term = searchTerm.toLowerCase();
-            
-            // กรองข้อมูลโดยหาจากทั้ง "ชื่อสคริปต์" และ "รายละเอียด"
             const filtered = scripts.filter(s => 
                 s.title.toLowerCase().includes(term) || 
                 (s.description || '').toLowerCase().includes(term)
@@ -410,7 +435,7 @@
 
         els.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
 
-        window.openDetail = (id) => {
+        window.openDetail = (id, skipPushState = false) => {
             const script = scripts.find(s => s.id === id);
             if (!script) return;
             
@@ -424,6 +449,12 @@
             script.views = (script.views || 0) + 1;
             saveScripts();
 
+            // อัปเดตลิงก์ URL อัตโนมัติเวลาเปิดดูสคริปต์
+            if (!skipPushState) {
+                const newUrl = window.location.pathname + '?s=' + encodeURIComponent(script.title);
+                window.history.pushState(null, '', newUrl);
+            }
+
             document.getElementById('copy-text').textContent = 'คัดลอกสคริปต์';
             document.getElementById('btn-copy').className = 'mt-6 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white py-3.5 rounded-full font-medium transition-all active:scale-[0.98] shadow-lg shadow-blue-900/30';
             
@@ -435,7 +466,7 @@
                 deleteContainer.classList.add('hidden');
             }
 
-            switchView('detail');
+            switchView('detail', skipPushState);
         };
 
         document.getElementById('btn-copy').addEventListener('click', () => {
@@ -448,7 +479,6 @@
             });
         });
 
-        // ระบบบันทึกข้อมูลลงเครื่อง
         els.addForm.addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -507,7 +537,7 @@
             saveScripts();
             updateUI();
             showToast('ลบสคริปต์สำเร็จ', 'success');
-            switchView('home');
+            els.btnBack.click();
             closeModal('modal-delete');
         });
 
