@@ -457,7 +457,7 @@
             });
         });
 
-        // บันทึกสคริปต์พร้อมแปลงรูปเป็น Base64 (ไม่ต้องพึ่ง Storage)
+        // บันทึกสคริปต์และรูปภาพลง Database โดยตรง (ไม่ต้องตั้งค่า Storage ให้ยุ่งยาก)
         els.addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!isAdmin || !dbInitialized) {
@@ -484,7 +484,7 @@
             reader.readAsDataURL(imageFile);
             reader.onload = async function () {
                 try {
-                    const imageUrl = reader.result; // แปลงรูปเป็น Base64 สำเร็จ
+                    const imageUrl = reader.result;
 
                     await addDoc(scriptsCollection, {
                         title, description, imageUrl, content,
@@ -497,7 +497,7 @@
                     window.scrollTo(0,0);
                 } catch (error) {
                     console.error("Error adding doc:", error);
-                    showToast('บันทึกไม่สำเร็จ', 'error');
+                    showToast('บันทึกไม่สำเร็จ (รูปอาจมีขนาดใหญ่เกินไป)', 'error');
                 } finally {
                     btn.innerHTML = originalHTML;
                     btn.disabled = false;
