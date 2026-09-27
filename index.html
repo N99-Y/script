@@ -368,6 +368,9 @@
             els.viewDetail.classList.add('hidden');
             
             if (viewName === 'home') {
+                // อัปเดตข้อมูลหน้าแรกรวมถึงยอดคนดูให้ตรงกับล่าสุดทุกครั้งที่กลับออกมา
+                updateUI(els.searchInput.value); 
+                
                 els.viewHome.classList.remove('hidden');
                 els.btnBack.classList.add('hidden');
                 els.searchContainer.classList.remove('hidden');
@@ -440,11 +443,13 @@
             document.getElementById('detail-image').src = script.imageUrl;
             document.getElementById('detail-title').textContent = script.title;
             document.getElementById('detail-description').textContent = script.description || 'ไม่มีคำอธิบายสำหรับสคริปต์นี้';
-            document.getElementById('detail-views').textContent = (script.views || 0) + 1;
-            document.getElementById('detail-code').textContent = script.content;
             
+            // บวกยอดวิวก่อนนำไปแสดง
             script.views = (script.views || 0) + 1;
             saveScripts();
+            
+            document.getElementById('detail-views').textContent = script.views;
+            document.getElementById('detail-code').textContent = script.content;
 
             if (!skipPushState) {
                 const newUrl = window.location.pathname + '?s=' + encodeURIComponent(script.title);
@@ -497,12 +502,11 @@
             const reader = new FileReader();
             reader.readAsDataURL(imageFile);
             reader.onload = function (event) {
-                // สร้าง Canvas เพื่อย่อขนาดรูป
                 const img = new Image();
                 img.src = event.target.result;
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; // บังคับความกว้างสูงสุด 800px เพื่อประหยัดพื้นที่
+                    const MAX_WIDTH = 800;
                     let width = img.width;
                     let height = img.height;
 
@@ -517,7 +521,6 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // บีบอัดไฟล์เป็น JPEG (คุณภาพ 70%) จะทำให้ไฟล์เล็กลงมาก
                     const compressedImageUrl = canvas.toDataURL('image/jpeg', 0.7);
 
                     try {
@@ -531,7 +534,7 @@
                         saveScripts();
                         updateUI(els.searchInput.value);
                         
-                        showToast('เพิ่มสคริปต์และลดขนาดรูปเรียบร้อย!', 'success');
+                        showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
                         els.addForm.reset();
                         closeModal('modal-create');
                         window.scrollTo(0,0);
