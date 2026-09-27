@@ -279,13 +279,12 @@
             }
             updateUI(document.getElementById('search-input').value);
 
-            // เช็คว่ามีลิงก์แชร์ส่งมาหรือไม่ (เช่น ?s=Nine)
             const urlParams = new URLSearchParams(window.location.search);
             const sharedTitle = urlParams.get('s');
             if (sharedTitle) {
                 const found = scripts.find(s => s.title.toLowerCase() === sharedTitle.toLowerCase());
                 if (found) {
-                    setTimeout(() => openDetail(found.id, true), 100); // true เพื่อไม่ต้องแก้ URL ซ้ำ
+                    setTimeout(() => openDetail(found.id, true), 100);
                 } else {
                     setTimeout(() => showToast('ไม่พบสคริปต์จากลิงก์', 'error'), 500);
                 }
@@ -375,7 +374,6 @@
                 document.querySelector('.fixed.bottom-6.right-6').classList.remove('hidden');
                 window.scrollTo(0,0);
                 
-                // คืนค่า URL กลับเป็นหน้าแรกเวลาออก
                 if (!isPopState) {
                     window.history.pushState(null, '', window.location.pathname);
                 }
@@ -389,7 +387,6 @@
 
         els.btnBack.addEventListener('click', () => switchView('home'));
 
-        // ระบบให้ปุ่ม Back ของมือถือใช้งานได้สมจริง
         window.addEventListener('popstate', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const sharedTitle = urlParams.get('s');
@@ -449,7 +446,6 @@
             script.views = (script.views || 0) + 1;
             saveScripts();
 
-            // อัปเดตลิงก์ URL อัตโนมัติเวลาเปิดดูสคริปต์
             if (!skipPushState) {
                 const newUrl = window.location.pathname + '?s=' + encodeURIComponent(script.title);
                 window.history.pushState(null, '', newUrl);
@@ -479,6 +475,7 @@
             });
         });
 
+        // ระบบบีบอัดรูปภาพอัตโนมัติก่อนบันทึก
         els.addForm.addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -499,29 +496,52 @@
 
             const reader = new FileReader();
             reader.readAsDataURL(imageFile);
-            reader.onload = function () {
-                try {
-                    const imageUrl = reader.result;
-                    const newScript = {
-                        id: 'script_' + Date.now(),
-                        title, description, imageUrl, content,
-                        views: 0, createdAt: Date.now()
-                    };
+            reader.onload = function (event) {
+                // สร้าง Canvas เพื่อย่อขนาดรูป
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; // บังคับความกว้างสูงสุด 800px เพื่อประหยัดพื้นที่
+                    let width = img.width;
+                    let height = img.height;
 
-                    scripts.unshift(newScript);
-                    saveScripts();
-                    updateUI(els.searchInput.value);
-                    
-                    showToast('เพิ่มสคริปต์เรียบร้อย!', 'success');
-                    els.addForm.reset();
-                    closeModal('modal-create');
-                    window.scrollTo(0,0);
-                } catch (error) {
-                    showToast('บันทึกไม่สำเร็จ (รูปมีขนาดใหญ่เกินไป)', 'error');
-                } finally {
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                }
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // บีบอัดไฟล์เป็น JPEG (คุณภาพ 70%) จะทำให้ไฟล์เล็กลงมาก
+                    const compressedImageUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+                    try {
+                        const newScript = {
+                            id: 'script_' + Date.now(),
+                            title, description, imageUrl: compressedImageUrl, content,
+                            views: 0, createdAt: Date.now()
+                        };
+
+                        scripts.unshift(newScript);
+                        saveScripts();
+                        updateUI(els.searchInput.value);
+                        
+                        showToast('เพิ่มสคริปต์และลดขนาดรูปเรียบร้อย!', 'success');
+                        els.addForm.reset();
+                        closeModal('modal-create');
+                        window.scrollTo(0,0);
+                    } catch (error) {
+                        showToast('พื้นที่ความจำเต็ม กรุณาลบสคริปต์เก่าๆ ออกบ้าง', 'error');
+                    } finally {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    }
+                };
             };
             reader.onerror = function () {
                 showToast('อ่านไฟล์รูปภาพไม่สำเร็จ', 'error');
